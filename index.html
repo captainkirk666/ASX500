@@ -165,7 +165,7 @@
     .stage-outer{padding:0;display:block;}
     .page{
       width:100%;
-      min-height:100vh;
+      height:400mm;
       box-shadow:none;
       margin:0;
     }
@@ -364,8 +364,11 @@ document.getElementById('printBtn').addEventListener('click', () => {
     alert('Data has not loaded yet — wait for status to show "live" before exporting.');
     return;
   }
+  fitLeading(); // re-fit immediately before printing, in case anything shifted
   window.print();
 });
+window.addEventListener('beforeprint', fitLeading);
+window.addEventListener('afterprint', fitLeading);
 
 load();
 </script>
