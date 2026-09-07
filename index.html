@@ -298,28 +298,52 @@ function applyAndRender(){
 }
 
 const BASE_LH_PT = 8;
-const MIN_LH_PT = 6.3; // just above the 6pt type size so lines never touch/clip
+const MIN_LH_PT = 6.15; // just above the 6pt type size so lines never touch/clip
 
 function fitLeading(){
   const columns = document.getElementById('columns');
   const cols = document.querySelectorAll('.col');
   if (!cols.length) return;
 
+  // always start from the full, most readable leading and measure fresh
   document.documentElement.style.setProperty('--rowLH', BASE_LH_PT + 'pt');
 
-  let lh = BASE_LH_PT;
-  for (let i = 0; i < 8; i++){
-    let ratio = 1;
-    cols.forEach(col => {
-      if (columns.clientHeight > 0){
-        ratio = Math.max(ratio, col.scrollHeight / columns.clientHeight);
-      }
-    });
-    if (ratio <= 1.001) break;
-    lh = Math.max(MIN_LH_PT, (lh / ratio) * 0.99);
-    document.documentElement.style.setProperty('--rowLH', lh.toFixed(2) + 'pt');
-    if (lh <= MIN_LH_PT) break;
+  let maxRowCount = 0;
+  cols.forEach(col => {
+    const n = col.querySelectorAll('.row').length;
+    if (n > maxRowCount) maxRowCount = n;
+  });
+  if (maxRowCount === 0){ checkOverflow(); return; }
+
+  const headEl = cols[0].querySelector('.col-head');
+  const headerHeight = headEl ? headEl.getBoundingClientRect().height : 0;
+  const availableHeight = columns.getBoundingClientRect().height;
+  const availableForRows = availableHeight - headerHeight;
+
+  const sampleRow = cols[0].querySelector('.row');
+  if (!sampleRow){ checkOverflow(); return; }
+  const rowHeightPx = sampleRow.getBoundingClientRect().height;
+  const computedLHPx = parseFloat(getComputedStyle(sampleRow).lineHeight);
+  const overheadPx = Math.max(0, rowHeightPx - computedLHPx); // border etc.
+
+  const idealRowHeightPx = availableForRows / maxRowCount;
+  let idealLHPx = (idealRowHeightPx - overheadPx) * 0.985; // small safety margin
+  let idealLHPt = idealLHPx * 0.75; // px -> pt (96dpi reference)
+
+  idealLHPt = Math.min(BASE_LH_PT, Math.max(MIN_LH_PT, idealLHPt));
+  document.documentElement.style.setProperty('--rowLH', idealLHPt.toFixed(2) + 'pt');
+
+  // fine-tune: nudge down further in small steps if rounding still leaves overflow
+  let guard = 0;
+  while (guard < 12){
+    let overflowing = false;
+    cols.forEach(col => { if (col.scrollHeight > columns.clientHeight + 0.5) overflowing = true; });
+    if (!overflowing || idealLHPt <= MIN_LH_PT) break;
+    idealLHPt = Math.max(MIN_LH_PT, idealLHPt - 0.03);
+    document.documentElement.style.setProperty('--rowLH', idealLHPt.toFixed(2) + 'pt');
+    guard++;
   }
+
   checkOverflow();
 }
 
