@@ -11,8 +11,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
-    /* Stock | Last | Open | Chg | Chg% | Vol | AvgVol | 52Hi | 52Lo */
-    --cols: 1.5fr 0.9fr 0.9fr 0.8fr 0.95fr 0.85fr 0.9fr 0.85fr 0.85fr;
+    /* Stock | Last | Open | Chg | Chg% | Vol | AvgVol | 52wk High | 52wk Low */
+    --cols: 1.4fr 0.85fr 0.85fr 0.75fr 0.9fr 0.8fr 0.85fr 1.3fr 1.3fr;
   }
   @page{
     size: 380mm 400mm;
@@ -120,9 +120,9 @@
     print-color-adjust:exact;
   }
   .col-head span{
-    font-size:6.6pt;
+    font-size:6.2pt;
     font-weight:700;
-    letter-spacing:0.2pt;
+    letter-spacing:0.1pt;
     padding:2pt 0;
     white-space:nowrap;
     overflow:hidden;
@@ -189,13 +189,13 @@
 
     <div class="columns" id="columns">
       <div class="col">
-        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52 Hi</span><span>52 Lo</span></div>
+        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52wk High</span><span>52wk Low</span></div>
       </div>
       <div class="col">
-        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52 Hi</span><span>52 Lo</span></div>
+        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52wk High</span><span>52wk Low</span></div>
       </div>
       <div class="col">
-        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52 Hi</span><span>52 Lo</span></div>
+        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52wk High</span><span>52wk Low</span></div>
       </div>
     </div>
   </div>
