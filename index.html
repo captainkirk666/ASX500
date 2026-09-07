@@ -67,7 +67,7 @@
     padding:10mm;
     display:flex;
     flex-direction:column;
-    overflow:hidden;
+    overflow:visible;
     flex-shrink:0;
   }
 
@@ -87,8 +87,8 @@
     flex:1;
     display:grid;
     grid-template-columns:1fr 1fr 1fr;
-    column-gap:8mm;
-    overflow:hidden;
+    column-gap:4mm;
+    overflow:visible;
     min-height:0;
   }
   .col{
@@ -98,7 +98,7 @@
   }
   .col:not(:first-child){
     border-left:0.6pt solid #111;
-    padding-left:8mm;
+    padding-left:4mm;
   }
 
   /* header + rows share the exact same grid, inside the exact same column,
@@ -107,10 +107,13 @@
     display:grid;
     grid-template-columns:var(--cols);
     column-gap:2mm;
+    padding-left:1mm;
   }
   .col-head{
     background:#000;
     color:#fff;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
   }
   .col-head span{
     font-size:6.6pt;
@@ -123,6 +126,7 @@
 
   .row{
     font-size:6pt;
+    font-weight:500;
     line-height:8pt;
     border-bottom:0.35pt solid #ccc;
   }
@@ -144,13 +148,24 @@
     color:#444;
   }
 
+  .overflow-warn{
+    display:none;
+    background:#ff6b6b;
+    color:#1a0000;
+    font-weight:700;
+    padding:6px 12px;
+    font-size:12px;
+  }
+  .overflow-warn.show{display:block;}
+
   @media print{
+    * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
     body{background:#fff;}
     .toolbar{display:none;}
     .stage-outer{padding:0;display:block;}
     .page{
       width:100%;
-      height:100vh;
+      min-height:100vh;
       box-shadow:none;
       margin:0;
     }
@@ -166,12 +181,12 @@
   <button id="refreshBtn">↻ Refresh</button>
   <button id="printBtn" disabled>⬇ Export PDF</button>
 </div>
+<div class="overflow-warn" id="overflowWarn">⚠ Content is taller than one 380×400mm page — some rows will spill onto a second printed page. Reduce font size, trim columns shown, or split the list to fix.</div>
 
 <div class="stage-outer">
   <div class="page" id="page">
     <div class="slug">
       <span id="dateline">—</span>
-      <span id="footSync"></span>
     </div>
 
     <div class="columns" id="columns">
@@ -279,6 +294,17 @@ function applyAndRender(){
   const rows = (hideNa ? allRows.filter(r => !r.na) : allRows)
     .sort((a,b) => a.Ticker.localeCompare(b.Ticker));
   render(rows);
+  checkOverflow();
+}
+
+function checkOverflow(){
+  const columns = document.getElementById('columns');
+  const cols = document.querySelectorAll('.col');
+  let overflowing = false;
+  cols.forEach(col => {
+    if (col.scrollHeight > columns.clientHeight + 1) overflowing = true;
+  });
+  document.getElementById('overflowWarn').classList.toggle('show', overflowing);
 }
 
 async function load(){
@@ -295,8 +321,8 @@ async function load(){
     status.textContent = 'live';
     const now = new Date();
     document.getElementById('dateline').textContent = now.toLocaleDateString(undefined,{weekday:'long', year:'numeric', month:'long', day:'numeric'});
-    document.getElementById('footSync').textContent = 'Last synced ' + now.toLocaleTimeString();
     applyAndRender();
+    checkOverflow();
     printBtn.disabled = false;
   }catch(e){
     status.className = 'status err';
