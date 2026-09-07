@@ -185,7 +185,6 @@
   <div class="page" id="page">
     <div class="slug">
       <span id="dateline">—</span>
-      <span id="footNote">Loading listings…</span>
     </div>
 
     <div class="columns" id="columns">
@@ -277,8 +276,6 @@ function render(rows){
     const head = col.querySelector('.col-head').outerHTML;
     col.innerHTML = head + chunks[i].map(rowHtml).join('');
   });
-  document.getElementById('footNote').textContent =
-    `${rows.length} listings shown${document.getElementById('hideNa').checked ? ' · inactive tickers hidden' : ''} · Source: Google Finance, via published Google Sheet`;
 }
 
 let allRows = [];
@@ -383,7 +380,7 @@ async function load(){
   }catch(e){
     status.className = 'status err';
     status.textContent = 'sync failed';
-    document.getElementById('footNote').textContent = 'Could not reach the published sheet: ' + e.message;
+    document.getElementById('exportStatus').textContent = 'sync failed: ' + e.message;
   }
 }
 
