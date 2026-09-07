@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
     /* Stock | Last | Open | Chg | Chg% | Vol | AvgVol | 52Hi | 52Lo */
@@ -175,6 +177,7 @@
   <label><input type="checkbox" id="hideNa" checked> hide inactive tickers</label>
   <button id="refreshBtn">↻ Refresh</button>
   <button id="printBtn" disabled>⬇ Export PDF</button>
+  <span id="exportStatus" style="color:#9a9a9a;font-size:11px;"></span>
 </div>
 <div class="overflow-warn" id="overflowWarn">⚠ Even at the tightest allowed leading, this list is taller than one 380×400mm page. Trim a column of data or split the list to fix.</div>
 
@@ -386,16 +389,59 @@ async function load(){
 
 document.getElementById('hideNa').addEventListener('change', applyAndRender);
 document.getElementById('refreshBtn').addEventListener('click', load);
-document.getElementById('printBtn').addEventListener('click', () => {
+document.getElementById('printBtn').addEventListener('click', exportExactPdf);
+
+async function exportExactPdf(){
   if (!allRows.length){
     alert('Data has not loaded yet — wait for status to show "live" before exporting.');
     return;
   }
-  fitLeading(); // re-fit immediately before printing, in case anything shifted
-  window.print();
-});
-window.addEventListener('beforeprint', fitLeading);
-window.addEventListener('afterprint', fitLeading);
+  fitLeading(); // make sure leading is settled against the current data
+
+  const printBtn = document.getElementById('printBtn');
+  const exportStatus = document.getElementById('exportStatus');
+  printBtn.disabled = true;
+  exportStatus.textContent = 'rendering…';
+
+  try{
+    const pageEl = document.getElementById('page');
+    const originalShadow = pageEl.style.boxShadow;
+    pageEl.style.boxShadow = 'none';
+
+    // Render the page element exactly as it appears on screen, at a
+    // resolution suitable for print (~300dpi from a 96dpi CSS layout).
+    const canvas = await html2canvas(pageEl, {
+      scale: 3.125,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      windowWidth: pageEl.scrollWidth,
+      windowHeight: pageEl.scrollHeight
+    });
+
+    pageEl.style.boxShadow = originalShadow;
+
+    exportStatus.textContent = 'building PDF…';
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [380, 400]
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    pdf.addImage(imgData, 'JPEG', 0, 0, 380, 400);
+    pdf.save('asx-stock-prices.pdf');
+
+    exportStatus.textContent = 'done';
+    setTimeout(() => { exportStatus.textContent = ''; }, 3000);
+  }catch(e){
+    exportStatus.textContent = 'export failed: ' + e.message;
+    console.error(e);
+  }finally{
+    printBtn.disabled = false;
+  }
+}
 
 load();
 </script>
