@@ -297,7 +297,7 @@ function fitLeading(){
   if (!cols.length) return;
 
   // always start from the full, most readable leading and measure fresh
-  document.documentElement.style.setProperty('--rowLH', BASE_LH_PT + 'pt');
+  applyLH(BASE_LH_PT);
 
   let maxRowCount = 0;
   cols.forEach(col => {
@@ -322,7 +322,7 @@ function fitLeading(){
   let idealLHPt = idealLHPx * 0.75; // px -> pt (96dpi reference)
 
   idealLHPt = Math.min(BASE_LH_PT, Math.max(MIN_LH_PT, idealLHPt));
-  document.documentElement.style.setProperty('--rowLH', idealLHPt.toFixed(2) + 'pt');
+  applyLH(idealLHPt);
 
   // fine-tune: nudge down further in small steps if rounding still leaves overflow
   let guard = 0;
@@ -331,11 +331,23 @@ function fitLeading(){
     cols.forEach(col => { if (col.scrollHeight > columns.clientHeight + 0.5) overflowing = true; });
     if (!overflowing || idealLHPt <= MIN_LH_PT) break;
     idealLHPt = Math.max(MIN_LH_PT, idealLHPt - 0.03);
-    document.documentElement.style.setProperty('--rowLH', idealLHPt.toFixed(2) + 'pt');
+    applyLH(idealLHPt);
     guard++;
   }
 
   checkOverflow();
+}
+
+function applyLH(pt){
+  // Set the CSS variable (for live on-screen measurement/behaviour) AND
+  // bake the value directly onto every row's own inline style. Some print
+  // engines snapshot the page for PDF output in a way that can silently
+  // drop runtime-set custom properties on the root element — inline
+  // per-element styles are far more reliable to survive that.
+  document.documentElement.style.setProperty('--rowLH', pt.toFixed(2) + 'pt');
+  document.querySelectorAll('.row').forEach(el => {
+    el.style.lineHeight = pt.toFixed(2) + 'pt';
+  });
 }
 
 function checkOverflow(){
