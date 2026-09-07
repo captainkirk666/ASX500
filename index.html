@@ -75,12 +75,14 @@
   .slug{
     display:flex;
     justify-content:space-between;
-    font-size:8pt;
+    gap:12pt;
+    font-size:7pt;
     color:#333;
     padding-bottom:2pt;
     margin-bottom:2pt;
     border-bottom:0.5pt solid #999;
   }
+  .slug span:last-child{color:#666;}
 
   /* ---------- three column layout ---------- */
   .columns{
@@ -138,15 +140,8 @@
   .row .down{color:#a3231d;}
   .row .flat{color:#666;}
 
-  .footer{
-    margin-top:2pt;
-    padding-top:2pt;
-    border-top:0.6pt solid #111;
-    display:flex;
-    justify-content:space-between;
-    font-size:6.5pt;
-    color:#444;
-  }
+  /* footer removed — its info now lives in the slug line to reclaim
+     every bit of vertical space for data rows */
 
   .overflow-warn{
     display:none;
@@ -187,6 +182,7 @@
   <div class="page" id="page">
     <div class="slug">
       <span id="dateline">—</span>
+      <span id="footNote">Loading listings…</span>
     </div>
 
     <div class="columns" id="columns">
@@ -199,11 +195,6 @@
       <div class="col">
         <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52 Hi</span><span>52 Lo</span></div>
       </div>
-    </div>
-
-    <div class="footer">
-      <span id="footNote">Loading listings…</span>
-      <span>Source: Google Finance, via published Google Sheet</span>
     </div>
   </div>
 </div>
@@ -284,7 +275,7 @@ function render(rows){
     col.innerHTML = head + chunks[i].map(rowHtml).join('');
   });
   document.getElementById('footNote').textContent =
-    `${rows.length} listings shown${document.getElementById('hideNa').checked ? ' · inactive tickers hidden' : ''}`;
+    `${rows.length} listings shown${document.getElementById('hideNa').checked ? ' · inactive tickers hidden' : ''} · Source: Google Finance, via published Google Sheet`;
 }
 
 let allRows = [];
