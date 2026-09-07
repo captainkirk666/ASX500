@@ -127,7 +127,7 @@
   .row{
     font-size:6pt;
     font-weight:500;
-    line-height:8pt;
+    line-height:var(--rowLH, 8pt);
     border-bottom:0.35pt solid #ccc;
   }
   .row:nth-child(odd){background:#f7f7f7;}
@@ -181,7 +181,7 @@
   <button id="refreshBtn">↻ Refresh</button>
   <button id="printBtn" disabled>⬇ Export PDF</button>
 </div>
-<div class="overflow-warn" id="overflowWarn">⚠ Content is taller than one 380×400mm page — some rows will spill onto a second printed page. Reduce font size, trim columns shown, or split the list to fix.</div>
+<div class="overflow-warn" id="overflowWarn">⚠ Even at the tightest allowed leading, this list is taller than one 380×400mm page. Trim a column of data or split the list to fix.</div>
 
 <div class="stage-outer">
   <div class="page" id="page">
@@ -294,6 +294,32 @@ function applyAndRender(){
   const rows = (hideNa ? allRows.filter(r => !r.na) : allRows)
     .sort((a,b) => a.Ticker.localeCompare(b.Ticker));
   render(rows);
+  fitLeading();
+}
+
+const BASE_LH_PT = 8;
+const MIN_LH_PT = 6.3; // just above the 6pt type size so lines never touch/clip
+
+function fitLeading(){
+  const columns = document.getElementById('columns');
+  const cols = document.querySelectorAll('.col');
+  if (!cols.length) return;
+
+  document.documentElement.style.setProperty('--rowLH', BASE_LH_PT + 'pt');
+
+  let lh = BASE_LH_PT;
+  for (let i = 0; i < 8; i++){
+    let ratio = 1;
+    cols.forEach(col => {
+      if (columns.clientHeight > 0){
+        ratio = Math.max(ratio, col.scrollHeight / columns.clientHeight);
+      }
+    });
+    if (ratio <= 1.001) break;
+    lh = Math.max(MIN_LH_PT, (lh / ratio) * 0.99);
+    document.documentElement.style.setProperty('--rowLH', lh.toFixed(2) + 'pt');
+    if (lh <= MIN_LH_PT) break;
+  }
   checkOverflow();
 }
 
