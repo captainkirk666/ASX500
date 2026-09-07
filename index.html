@@ -64,7 +64,7 @@
     height:400mm;
     background:#ffffff;
     box-shadow:0 4px 30px rgba(0,0,0,0.35);
-    padding:10mm;
+    padding:6mm;
     display:flex;
     flex-direction:column;
     overflow:visible;
@@ -77,8 +77,8 @@
     justify-content:space-between;
     font-size:8pt;
     color:#333;
-    padding-bottom:4pt;
-    margin-bottom:4pt;
+    padding-bottom:2pt;
+    margin-bottom:2pt;
     border-bottom:0.5pt solid #999;
   }
 
@@ -119,7 +119,7 @@
     font-size:6.6pt;
     font-weight:700;
     letter-spacing:0.2pt;
-    padding:3pt 0;
+    padding:2pt 0;
     white-space:nowrap;
     overflow:hidden;
   }
@@ -128,7 +128,7 @@
     font-size:6pt;
     font-weight:500;
     line-height:var(--rowLH, 8pt);
-    border-bottom:0.35pt solid #ccc;
+    border-bottom:0.2pt solid #ccc;
   }
   .row:nth-child(odd){background:#f7f7f7;}
   .row .t{font-weight:700;}
@@ -139,12 +139,12 @@
   .row .flat{color:#666;}
 
   .footer{
-    margin-top:5pt;
-    padding-top:3pt;
+    margin-top:2pt;
+    padding-top:2pt;
     border-top:0.6pt solid #111;
     display:flex;
     justify-content:space-between;
-    font-size:7pt;
+    font-size:6.5pt;
     color:#444;
   }
 
@@ -298,7 +298,7 @@ function applyAndRender(){
 }
 
 const BASE_LH_PT = 8;
-const MIN_LH_PT = 6.15; // just above the 6pt type size so lines never touch/clip
+const MIN_LH_PT = 6.05; // just above the 6pt type size so lines never touch/clip
 
 function fitLeading(){
   const columns = document.getElementById('columns');
