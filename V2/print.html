@@ -316,10 +316,6 @@ const INDICES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSf6lda
 // Any ticker not found in your Data tab is silently skipped (no #N/A shown).
 const ASX_LEADERS = ['BHP','CBA','CSL','NAB','WBC','ANZ','WES','WOW','TLS','RIO'];
 const KEY_RESOURCES = [
-  { name: 'Iron Ore',   ticker: 'FMG' },
-  { name: 'Copper',     ticker: 'CSC' },
-  { name: 'Coal',       ticker: 'WHC' },
-  { name: 'Gold',       ticker: 'NST' },
   { name: 'Lithium',    ticker: 'PLS' },
   { name: 'Nickel',     ticker: 'IGO' },
   { name: 'Uranium',    ticker: 'BOE' },
@@ -327,6 +323,11 @@ const KEY_RESOURCES = [
   { name: 'Oil & Gas',  ticker: 'STO' },
   { name: 'Alumina',    ticker: 'S32' }
 ];
+
+// Published CSV from your Commodities tab (Apps Script + API Ninjas —
+// section 7 of the guide), with rows for gold, silver, platinum, copper.
+// Expected columns: Commodity | API Name | Price | Prev Close | Change $ | Change %
+const COMMODITIES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSf6ldadqkMU5BqZt4PsbRGL9Kww33aZ1t60blQv2nDFZ--JjusENl5H7iPe4Jr-dMxeUXgbBkAsSjo/pub?gid=1898947044&single=true&output=csv";
 
 function num(v){
   if (v === undefined || v === null) return NaN;
@@ -476,6 +477,54 @@ function renderTopGrid(rows){
   renderPanelList('panel-volume', volumeLeaders, r => r.Ticker, r => priceStr(r), r => changeStr(r), r => r.Volume || '—', () => 'flat');
   renderPanelList('panel-leaders', asxLeaders, r => r.Ticker, r => priceStr(r), r => changeStr(r), r => pctStr(r), r => dirOf(r));
   renderPanelList('panel-resources', keyResources, item => item.name, item => priceStr(item.row), item => changeStr(item.row), item => pctStr(item.row), item => dirOf(item.row));
+  loadKeyResources(keyResources);
+}
+
+async function loadKeyResources(proxyItems){
+  const panelEl = document.getElementById('panel-resources');
+
+  // Normalize the proxy-stock rows into the same shape as real commodity rows.
+  const proxyRows = proxyItems.map(item => ({
+    name: item.name,
+    price: item.row.Price,
+    change: item.row.Change,
+    changePct: item.row.na || isNaN(item.row.ChangePct) ? NaN : (item.row.Change < 0 ? -Math.abs(item.row.ChangePct) : Math.abs(item.row.ChangePct))
+  }));
+
+  if (!COMMODITIES_CSV_URL || COMMODITIES_CSV_URL.indexOf('REPLACE_WITH') === 0){
+    // No live commodity source yet — just show the proxy stocks so the panel isn't empty.
+    renderResourceRows(panelEl, proxyRows);
+    return;
+  }
+
+  try{
+    const text = await fetchCsvText(COMMODITIES_CSV_URL);
+    const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+    const commodityRows = parsed.data.map(r => {
+      const keys = Object.keys(r);
+      const name = (r['Commodity'] !== undefined ? r['Commodity'] : r[keys[0]] || '').toString().trim();
+      const price = num(r['Price'] !== undefined ? r['Price'] : r[keys[2]]);
+      const change = num(r['Change $'] !== undefined ? r['Change $'] : r[keys[4]]);
+      const changePct = num(r['Change %'] !== undefined ? r['Change %'] : r[keys[5]]);
+      return { name, price, change, changePct };
+    }).filter(r => r.name && !isNaN(r.price));
+
+    renderResourceRows(panelEl, [...commodityRows, ...proxyRows]);
+  }catch(e){
+    // Fall back to proxy-only rows rather than showing nothing.
+    renderResourceRows(panelEl, proxyRows);
+  }
+}
+
+function renderResourceRows(panelEl, rows){
+  if (!rows.length){ panelEl.innerHTML = '<div class="panel-empty">No data</div>'; return; }
+  panelEl.innerHTML = rows.slice(0, 10).map(r => {
+    const dir = isNaN(r.change) ? 'flat' : (r.change > 0 ? 'up' : r.change < 0 ? 'down' : 'flat');
+    const priceDisp = isNaN(r.price) ? '—' : '$' + r.price.toFixed(2);
+    const chgDisp = isNaN(r.change) ? '—' : (r.change >= 0 ? '+' : '') + r.change.toFixed(2);
+    const pctDisp = isNaN(r.changePct) ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
+    return panelRowHtml(r.name, priceDisp, chgDisp, pctDisp, dir);
+  }).join('');
 }
 
 async function loadIndices(){
