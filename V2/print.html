@@ -480,6 +480,8 @@ function renderTopGrid(rows){
   loadKeyResources(keyResources);
 }
 
+let lastGoodResourceRows = null;
+
 async function loadKeyResources(proxyItems){
   const panelEl = document.getElementById('panel-resources');
 
@@ -509,10 +511,17 @@ async function loadKeyResources(proxyItems){
       return { name, price, change, changePct };
     }).filter(r => r.name && !isNaN(r.price));
 
-    renderResourceRows(panelEl, [...commodityRows, ...proxyRows]);
+    if (commodityRows.length){
+      // Only overwrite the "known good" snapshot on an actual successful fetch
+      // with real data — this is what makes a future flaky fetch harmless.
+      lastGoodResourceRows = [...commodityRows, ...proxyRows];
+    }
+    renderResourceRows(panelEl, lastGoodResourceRows || proxyRows);
   }catch(e){
-    // Fall back to proxy-only rows rather than showing nothing.
-    renderResourceRows(panelEl, proxyRows);
+    // Network/proxy hiccup — keep showing the last known-good data rather
+    // than wiping the panel. Only show proxy-only as an absolute last resort
+    // if we've never had a successful fetch at all.
+    renderResourceRows(panelEl, lastGoodResourceRows || proxyRows);
   }
 }
 
@@ -526,6 +535,8 @@ function renderResourceRows(panelEl, rows){
     return panelRowHtml(r.name, priceDisp, chgDisp, pctDisp, dir);
   }).join('');
 }
+
+let lastGoodIndicesHtml = null;
 
 async function loadIndices(){
   const panelEl = document.getElementById('panel-indices');
@@ -552,17 +563,21 @@ async function loadIndices(){
       changePct: isNaN(r.changePctRaw) ? NaN : r.changePctRaw * 100
     }));
 
-    if (!finalRows.length){ panelEl.innerHTML = '<div class="panel-empty">No index data found</div>'; return; }
+    if (finalRows.length){
+      lastGoodIndicesHtml = finalRows.slice(0, 10).map(r => {
+        const dir = isNaN(r.change) ? 'flat' : (r.change > 0 ? 'up' : r.change < 0 ? 'down' : 'flat');
+        const pct = isNaN(r.changePct) ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
+        const chgDisp = isNaN(r.change) ? '—' : (r.change >= 0 ? '+' : '') + r.change.toFixed(1);
+        const priceDisp = isNaN(r.price) ? '—' : r.price.toLocaleString(undefined, {maximumFractionDigits: 1, minimumFractionDigits: 1});
+        return panelRowHtml(r.name, priceDisp, chgDisp, pct, dir);
+      }).join('');
+    }
 
-    panelEl.innerHTML = finalRows.slice(0, 10).map(r => {
-      const dir = isNaN(r.change) ? 'flat' : (r.change > 0 ? 'up' : r.change < 0 ? 'down' : 'flat');
-      const pct = isNaN(r.changePct) ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
-      const chgDisp = isNaN(r.change) ? '—' : (r.change >= 0 ? '+' : '') + r.change.toFixed(1);
-      const priceDisp = isNaN(r.price) ? '—' : r.price.toLocaleString(undefined, {maximumFractionDigits: 1, minimumFractionDigits: 1});
-      return panelRowHtml(r.name, priceDisp, chgDisp, pct, dir);
-    }).join('');
+    panelEl.innerHTML = lastGoodIndicesHtml || '<div class="panel-empty">No index data found</div>';
   }catch(e){
-    panelEl.innerHTML = '<div class="panel-empty">Could not load indices</div>';
+    // Network/proxy hiccup — keep showing the last known-good data rather
+    // than wiping the panel with an error message.
+    panelEl.innerHTML = lastGoodIndicesHtml || '<div class="panel-empty">Could not load indices</div>';
   }
 }
 
@@ -664,7 +679,11 @@ async function load(){
     const now = new Date();
     document.getElementById('dateline').textContent = now.toLocaleDateString(undefined,{weekday:'long', year:'numeric', month:'long', day:'numeric'});
     applyAndRender();
-    loadIndices();
+    // Staggered slightly so the Indices and Commodities fetches (both fired
+    // via applyAndRender/renderTopGrid) don't all hit the free CORS proxies
+    // in the exact same instant as the main Data fetch — that concurrent
+    // burst was the likely cause of the intermittent proxy failures.
+    setTimeout(loadIndices, 1500);
     checkOverflow();
     printBtn.disabled = false;
   }catch(e){
