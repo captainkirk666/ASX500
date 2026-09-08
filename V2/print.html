@@ -456,18 +456,22 @@ async function loadIndices(){
   }
   try{
     const text = await fetchCsvText(INDICES_CSV_URL);
-    const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
-    const rows = parsed.data.map(r => {
-      const keys = Object.keys(r);
-      const name = (r['Index'] !== undefined ? r['Index'] : r[keys[0]] || '').toString().trim();
-      const change = num(r['Change'] !== undefined ? r['Change'] : r[keys[2]]);
-      const changePct = num(r['Change %'] !== undefined ? r['Change %'] : r[keys[3]]);
-      return { name, change, changePct };
-    }).filter(r => r.name);
+    const parsed = Papa.parse(text, {header:false, skipEmptyLines:true});
 
-    if (!rows.length){ panelEl.innerHTML = '<div class="panel-empty">No index data found</div>'; return; }
+    // Drop a possible header row (where the "price" column isn't numeric).
+    const cleanRows = parsed.data
+      .map(r => ({ name: (r[0] || '').toString().trim(), price: num(r[1]), change: num(r[2]), changePctRaw: num(r[3]) }))
+      .filter(r => r.name && !isNaN(r.price));
 
-    panelEl.innerHTML = rows.slice(0, 10).map(r => {
+    const finalRows = cleanRows.map(r => ({
+      name: r.name,
+      change: r.change,
+      changePct: isNaN(r.changePctRaw) ? NaN : r.changePctRaw * 100
+    }));
+
+    if (!finalRows.length){ panelEl.innerHTML = '<div class="panel-empty">No index data found</div>'; return; }
+
+    panelEl.innerHTML = finalRows.slice(0, 10).map(r => {
       const dir = isNaN(r.change) ? 'flat' : (r.change > 0 ? 'up' : r.change < 0 ? 'down' : 'flat');
       const pct = isNaN(r.changePct) ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
       return panelRowHtml(r.name, pct, dir);
