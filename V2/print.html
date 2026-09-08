@@ -100,19 +100,18 @@
     flex-direction:column;
     min-width:0;
     overflow:hidden;
-    border-left:0.6pt solid #111;
+    border-left:0.6pt solid #ccc;
     padding-left:2.5mm;
   }
   .panel:first-child{border-left:none;padding-left:0;}
   .panel-head{
-    background:#000;
-    color:#fff;
-    font-size:6.4pt;
-    font-weight:700;
-    letter-spacing:0.2pt;
-    padding:3pt 4pt;
-    -webkit-print-color-adjust:exact;
-    print-color-adjust:exact;
+    font-size:9.5pt;
+    font-weight:900;
+    letter-spacing:0.1pt;
+    color:#111;
+    padding-bottom:3pt;
+    margin-bottom:3pt;
+    border-bottom:2pt solid var(--accent, #111);
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -120,37 +119,49 @@
   .panel-body{
     flex:1;
     overflow:hidden;
-    padding-top:1pt;
   }
   .panel-row{
     display:flex;
+    align-items:center;
     justify-content:space-between;
-    gap:3pt;
-    font-size:7pt;
-    line-height:1.65;
-    border-bottom:0.2pt solid #e0e0e0;
-    padding:0 1pt;
+    gap:4pt;
+    padding:2pt 0;
+    border-bottom:0.3pt solid #eee;
   }
-  .panel-row:nth-child(odd){background:#f7f7f7;}
   .panel-row .name{
+    font-size:9.5pt;
     font-weight:700;
+    color:#222;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
   }
   .panel-row .val{
+    font-size:11.5pt;
+    font-weight:900;
     white-space:nowrap;
     flex-shrink:0;
+    padding:1pt 5pt;
+    border-radius:3pt;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
   }
-  .panel-row .up{color:#0f6b34;}
-  .panel-row .down{color:#a3231d;}
-  .panel-row .flat{color:#666;}
+  .panel-row .val.up{color:#0f6b34;background:#e2f5ea;}
+  .panel-row .val.down{color:#a3231d;background:#fbe9e8;}
+  .panel-row .val.flat{color:#444;background:#f0f0f0;}
   .panel-empty{
-    font-size:6.5pt;
+    font-size:7pt;
     color:#888;
     font-style:italic;
     padding:4pt 2pt;
   }
+
+  .panel-indices   { --accent:#1a3a5c; }
+  .panel-winners   { --accent:#0f6b34; }
+  .panel-losers    { --accent:#a3231d; }
+  .panel-leaders   { --accent:#b8860b; }
+  .panel-volume    { --accent:#1565c0; }
+  .panel-resources { --accent:#7a4a1e; }
 
   /* ---------- three column layout ---------- */
   .columns{
@@ -254,12 +265,12 @@
     </div>
 
     <div class="top-grid" id="topGrid">
-      <div class="panel"><div class="panel-head">Indices</div><div class="panel-body" id="panel-indices"></div></div>
-      <div class="panel"><div class="panel-head">Top 10 Winners</div><div class="panel-body" id="panel-winners"></div></div>
-      <div class="panel"><div class="panel-head">Top 10 Losers</div><div class="panel-body" id="panel-losers"></div></div>
-      <div class="panel"><div class="panel-head">ASX Leaders</div><div class="panel-body" id="panel-leaders"></div></div>
-      <div class="panel"><div class="panel-head">Volume Leaders</div><div class="panel-body" id="panel-volume"></div></div>
-      <div class="panel"><div class="panel-head">Key Resources</div><div class="panel-body" id="panel-resources"></div></div>
+      <div class="panel panel-indices"><div class="panel-head">Indices</div><div class="panel-body" id="panel-indices"></div></div>
+      <div class="panel panel-winners"><div class="panel-head">Top 10 Winners</div><div class="panel-body" id="panel-winners"></div></div>
+      <div class="panel panel-losers"><div class="panel-head">Top 10 Losers</div><div class="panel-body" id="panel-losers"></div></div>
+      <div class="panel panel-leaders"><div class="panel-head">ASX Leaders</div><div class="panel-body" id="panel-leaders"></div></div>
+      <div class="panel panel-volume"><div class="panel-head">Volume Leaders</div><div class="panel-body" id="panel-volume"></div></div>
+      <div class="panel panel-resources"><div class="panel-head">Key Resources</div><div class="panel-body" id="panel-resources"></div></div>
     </div>
 
     <div class="columns" id="columns">
@@ -285,7 +296,7 @@ const INDICES_CSV_URL = "REPLACE_WITH_INDICES_CSV_URL";
 
 // Curated ticker lists for the ASX Leaders and Key Resources panels.
 // Any ticker not found in your Data tab is silently skipped (no #N/A shown).
-const ASX_LEADERS = ['BHP','CBA','CSL','NAB','WBC','ANZ','WES','WOW','TLS','RIO','MQG','GMG','FMG','TCL'];
+const ASX_LEADERS = ['BHP','CBA','CSL','NAB','WBC','ANZ','WES','WOW','TLS','RIO'];
 const KEY_RESOURCES = [
   { name: 'Iron Ore',   ticker: 'FMG' },
   { name: 'Copper',     ticker: 'CSC' },
@@ -426,7 +437,8 @@ function renderTopGrid(rows){
 
   const asxLeaders = ASX_LEADERS
     .map(t => active.find(r => r.Ticker === t))
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, 10);
 
   const keyResources = KEY_RESOURCES
     .map(kr => { const row = active.find(r => r.Ticker === kr.ticker); return row ? { name: kr.name, row } : null; })
