@@ -1,1 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASX Stock Prices (Print Page)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    /* Stock | Last | Open | Chg | Chg% | Vol | AvgVol | 52wk High | 52wk Low */
+    --cols: 1.4fr 0.85fr 0.85fr 0.75fr 0.9fr 0.8fr 0.85fr 1.3fr 1.3fr;
+  }
+  @page{
+    size: 380mm 400mm;
+    margin: 0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#dcdcdc;}
+  body{font-family:'Roboto', Arial, sans-serif;color:#111;}
 
+  /* ---------- on-screen chrome (hidden in print) ---------- */
+  .toolbar{
+    position:fixed;
+    top:0;left:0;right:0;
+    z-index:50;
+    background:#1a1a1a;
+    color:#eee;
+    padding:10px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    font-family:'Roboto', sans-serif;
+    font-size:13px;
+  }
+  .toolbar .title{font-weight:700;color:#fff;margin-right:auto;}
+  .toolbar button{
+    font-family:inherit;
+    font-size:12.5px;
+    background:#fff;
+    color:#111;
+    border:none;
+    padding:7px 14px;
+    cursor:pointer;
+    font-weight:500;
+  }
+  .toolbar button:disabled{opacity:0.4;cursor:not-allowed;}
+  .toolbar button:not(:disabled):hover{background:#f0c419;}
+  .toolbar .status{color:#9a9a9a;}
+  .toolbar .status.live{color:#5fd08a;}
+  .toolbar .status.err{color:#ff6b6b;}
+  .toolbar label{display:flex;align-items:center;gap:5px;color:#ccc;font-size:12px;}
+
+  .stage-outer{
+    padding:64px 20px 40px;
+    display:flex;
+    justify-content:center;
+  }
+
+  /* the physical page, sized in real mm */
+  .page{
+    width:380mm;
+    height:400mm;
+    background:#ffffff;
+    box-shadow:0 4px 30px rgba(0,0,0,0.35);
+    padding:6mm;
+    display:flex;
+    flex-direction:column;
+    overflow:visible;
+    flex-shrink:0;
+  }
+
+  /* ---------- slug line (small, non-branded) ---------- */
+  .slug{
+    display:flex;
+    justify-content:space-between;
+    gap:12pt;
+    font-size:7pt;
+    color:#333;
+    padding-bottom:2pt;
+    margin-bottom:2pt;
+    border-bottom:0.5pt solid #999;
+  }
+  .slug span:last-child{color:#666;}
+
+  /* ---------- three column layout ---------- */
+  .columns{
+    flex:1;
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    column-gap:4mm;
+    overflow:visible;
+    min-height:0;
+  }
+  .col{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  .col:not(:first-child){
+    border-left:0.6pt solid #111;
+    padding-left:4mm;
+  }
+
+  /* header + rows share the exact same grid, inside the exact same column,
+     so they are guaranteed to line up */
+  .col-head, .row{
+    display:grid;
+    grid-template-columns:var(--cols);
+    column-gap:2mm;
+    padding-left:1mm;
+  }
+  .col-head{
+    background:#000;
+    color:#fff;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .col-head span{
+    font-size:6.2pt;
+    font-weight:700;
+    letter-spacing:0.1pt;
+    padding:2pt 0;
+    white-space:nowrap;
+    overflow:hidden;
+  }
+
+  .row{
+    font-size:6pt;
+    font-weight:500;
+    line-height:var(--rowLH, 8pt);
+    border-bottom:0.2pt solid #ccc;
+  }
+  .row:nth-child(odd){background:#f7f7f7;}
+  .row .t{font-weight:700;}
+  .row span, .col-head span{text-align:left;}
+  .row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row .up{color:#0f6b34;}
+  .row .down{color:#a3231d;}
+  .row .flat{color:#666;}
+
+  /* footer removed — its info now lives in the slug line to reclaim
+     every bit of vertical space for data rows */
+
+  .overflow-warn{
+    display:none;
+    background:#ff6b6b;
+    color:#1a0000;
+    font-weight:700;
+    padding:6px 12px;
+    font-size:12px;
+  }
+  .overflow-warn.show{display:block;}
+
+  @media print{
+    * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    body{background:#fff;}
+    .toolbar{display:none;}
+    .stage-outer{padding:0;display:block;}
+    .page{
+      width:100%;
+      height:400mm;
+      box-shadow:none;
+      margin:0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="title">ASX Print Page</div>
+  <span class="status" id="status">connecting…</span>
+  <label><input type="checkbox" id="hideNa" checked> hide inactive tickers</label>
+  <button id="refreshBtn">↻ Refresh</button>
+  <button id="printBtn" disabled>⬇ Export PDF</button>
+  <span id="exportStatus" style="color:#9a9a9a;font-size:11px;"></span>
+</div>
+<div class="overflow-warn" id="overflowWarn">⚠ Even at the tightest allowed leading, this list is taller than one 380×400mm page. Trim a column of data or split the list to fix.</div>
+
+<div class="stage-outer">
+  <div class="page" id="page">
+    <div class="slug">
+      <span id="dateline">—</span>
+    </div>
+
+    <div class="columns" id="columns">
+      <div class="col">
+        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg $</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52wk High</span><span>52wk Low</span></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg $</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52wk High</span><span>52wk Low</span></div>
+      </div>
+      <div class="col">
+        <div class="col-head"><span>Stock</span><span>Last</span><span>Open</span><span>Chg $</span><span>Chg %</span><span>Vol</span><span>Avg Vol</span><span>52wk High</span><span>52wk Low</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSf6ldadqkMU5BqZt4PsbRGL9Kww33aZ1t60blQv2nDFZ--JjusENl5H7iPe4Jr-dMxeUXgbBkAsSjo/pub?output=csv";
+
+function num(v){
+  if (v === undefined || v === null) return NaN;
+  const s = String(v).replace(/[^0-9.\-]/g,'');
+  if (s === '' || s === '-') return NaN;
+  return parseFloat(s);
+}
+
+async function fetchCsvText(){
+  const attempts = [
+    CSV_URL,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(CSV_URL),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(CSV_URL)
+  ];
+  const errors = [];
+  for (const url of attempts){
+    try{
+      const res = await fetch(url, {cache:'no-store'});
+      if (!res.ok){ errors.push('http '+res.status); continue; }
+      const text = await res.text();
+      if (text && text.trim().length > 20 && text.includes(',')) return text;
+      errors.push('empty response');
+    }catch(e){
+      errors.push(e && e.message ? e.message : 'network error');
+    }
+  }
+  throw new Error(errors.join(' | '));
+}
+
+function parseRows(raw){
+  return raw.map(r => {
+    const price = num(r['Price']);
+    return {
+      Ticker: (r['Ticker'] || '').trim(),
+      Price: price,
+      Open: num(r['Open']),
+      Change: num(r['Change']),
+      ChangePct: num(r['Change %']),
+      Volume: (r['Volume'] || '').trim(),
+      AveVol: (r['Ave Vol'] || '').trim(),
+      High52: num(r['52-week high']),
+      Low52: num(r['52-week low']),
+      na: isNaN(price)
+    };
+  }).filter(r => r.Ticker);
+}
+
+function rowHtml(r){
+  const dir = r.na ? 'flat' : (r.Change > 0 ? 'up' : r.Change < 0 ? 'down' : 'flat');
+  const chgSign = r.na ? '' : (r.Change > 0 ? '+' : r.Change < 0 ? '' : '');
+  const pctSign = r.na ? '' : (r.Change < 0 ? '-' : '+');
+  const pctVal = isNaN(r.ChangePct) ? '—' : Math.abs(r.ChangePct).toFixed(2)+'%';
+  return `<div class="row">
+    <span class="t">${r.Ticker}</span>
+    <span>${r.na ? '—' : r.Price.toFixed(2)}</span>
+    <span>${r.na || isNaN(r.Open) ? '—' : r.Open.toFixed(2)}</span>
+    <span class="${dir}">${r.na ? '—' : chgSign+r.Change.toFixed(2)}</span>
+    <span class="${dir}">${r.na ? '—' : pctSign+pctVal}</span>
+    <span>${r.Volume || '—'}</span>
+    <span>${r.AveVol || '—'}</span>
+    <span>${r.na || isNaN(r.High52) ? '—' : r.High52.toFixed(2)}</span>
+    <span>${r.na || isNaN(r.Low52) ? '—' : r.Low52.toFixed(2)}</span>
+  </div>`;
+}
+
+function render(rows){
+  const cols = document.querySelectorAll('.col');
+  const size = Math.ceil(rows.length / 3);
+  const chunks = [rows.slice(0,size), rows.slice(size,size*2), rows.slice(size*2)];
+  cols.forEach((col, i) => {
+    const head = col.querySelector('.col-head').outerHTML;
+    col.innerHTML = head + chunks[i].map(rowHtml).join('');
+  });
+}
+
+let allRows = [];
+
+function applyAndRender(){
+  const hideNa = document.getElementById('hideNa').checked;
+  const rows = (hideNa ? allRows.filter(r => !r.na) : allRows)
+    .sort((a,b) => a.Ticker.localeCompare(b.Ticker));
+  render(rows);
+  fitLeading();
+}
+
+const BASE_LH_PT = 8;
+const MIN_LH_PT = 6.05; // just above the 6pt type size so lines never touch/clip
+
+function fitLeading(){
+  const columns = document.getElementById('columns');
+  const cols = document.querySelectorAll('.col');
+  if (!cols.length) return;
+
+  // always start from the full, most readable leading and measure fresh
+  applyLH(BASE_LH_PT);
+
+  let maxRowCount = 0;
+  cols.forEach(col => {
+    const n = col.querySelectorAll('.row').length;
+    if (n > maxRowCount) maxRowCount = n;
+  });
+  if (maxRowCount === 0){ checkOverflow(); return; }
+
+  const headEl = cols[0].querySelector('.col-head');
+  const headerHeight = headEl ? headEl.getBoundingClientRect().height : 0;
+  const availableHeight = columns.getBoundingClientRect().height;
+  const availableForRows = availableHeight - headerHeight;
+
+  const sampleRow = cols[0].querySelector('.row');
+  if (!sampleRow){ checkOverflow(); return; }
+  const rowHeightPx = sampleRow.getBoundingClientRect().height;
+  const computedLHPx = parseFloat(getComputedStyle(sampleRow).lineHeight);
+  const overheadPx = Math.max(0, rowHeightPx - computedLHPx); // border etc.
+
+  const idealRowHeightPx = availableForRows / maxRowCount;
+  let idealLHPx = (idealRowHeightPx - overheadPx) * 0.985; // small safety margin
+  let idealLHPt = idealLHPx * 0.75; // px -> pt (96dpi reference)
+
+  idealLHPt = Math.min(BASE_LH_PT, Math.max(MIN_LH_PT, idealLHPt));
+  applyLH(idealLHPt);
+
+  // fine-tune: nudge down further in small steps if rounding still leaves overflow
+  let guard = 0;
+  while (guard < 12){
+    let overflowing = false;
+    cols.forEach(col => { if (col.scrollHeight > columns.clientHeight + 0.5) overflowing = true; });
+    if (!overflowing || idealLHPt <= MIN_LH_PT) break;
+    idealLHPt = Math.max(MIN_LH_PT, idealLHPt - 0.03);
+    applyLH(idealLHPt);
+    guard++;
+  }
+
+  checkOverflow();
+}
+
+function applyLH(pt){
+  // Set the CSS variable (for live on-screen measurement/behaviour) AND
+  // bake the value directly onto every row's own inline style. Some print
+  // engines snapshot the page for PDF output in a way that can silently
+  // drop runtime-set custom properties on the root element — inline
+  // per-element styles are far more reliable to survive that.
+  document.documentElement.style.setProperty('--rowLH', pt.toFixed(2) + 'pt');
+  document.querySelectorAll('.row').forEach(el => {
+    el.style.lineHeight = pt.toFixed(2) + 'pt';
+  });
+}
+
+function checkOverflow(){
+  const columns = document.getElementById('columns');
+  const cols = document.querySelectorAll('.col');
+  let overflowing = false;
+  cols.forEach(col => {
+    if (col.scrollHeight > columns.clientHeight + 1) overflowing = true;
+  });
+  document.getElementById('overflowWarn').classList.toggle('show', overflowing);
+}
+
+async function load(){
+  const status = document.getElementById('status');
+  const printBtn = document.getElementById('printBtn');
+  status.className = 'status';
+  status.textContent = 'syncing…';
+  printBtn.disabled = true;
+  try{
+    const text = await fetchCsvText();
+    const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+    allRows = parseRows(parsed.data);
+    status.className = 'status live';
+    status.textContent = 'live';
+    const now = new Date();
+    document.getElementById('dateline').textContent = now.toLocaleDateString(undefined,{weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    applyAndRender();
+    checkOverflow();
+    printBtn.disabled = false;
+  }catch(e){
+    status.className = 'status err';
+    status.textContent = 'sync failed';
+    document.getElementById('exportStatus').textContent = 'sync failed: ' + e.message;
+  }
+}
+
+document.getElementById('hideNa').addEventListener('change', applyAndRender);
+document.getElementById('refreshBtn').addEventListener('click', load);
+document.getElementById('printBtn').addEventListener('click', exportExactPdf);
+
+async function exportExactPdf(){
+  if (!allRows.length){
+    alert('Data has not loaded yet — wait for status to show "live" before exporting.');
+    return;
+  }
+  fitLeading(); // make sure leading is settled against the current data
+
+  const printBtn = document.getElementById('printBtn');
+  const exportStatus = document.getElementById('exportStatus');
+  printBtn.disabled = true;
+  exportStatus.textContent = 'rendering…';
+
+  try{
+    const pageEl = document.getElementById('page');
+    const originalShadow = pageEl.style.boxShadow;
+    pageEl.style.boxShadow = 'none';
+
+    // Render the page element exactly as it appears on screen, at a
+    // resolution suitable for print (~300dpi from a 96dpi CSS layout).
+    const canvas = await html2canvas(pageEl, {
+      scale: 3.125,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      windowWidth: pageEl.scrollWidth,
+      windowHeight: pageEl.scrollHeight
+    });
+
+    pageEl.style.boxShadow = originalShadow;
+
+    exportStatus.textContent = 'building PDF…';
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [380, 400]
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    pdf.addImage(imgData, 'JPEG', 0, 0, 380, 400);
+    pdf.save('asx-stock-prices.pdf');
+
+    exportStatus.textContent = 'done';
+    setTimeout(() => { exportStatus.textContent = ''; }, 3000);
+  }catch(e){
+    exportStatus.textContent = 'export failed: ' + e.message;
+    console.error(e);
+  }finally{
+    printBtn.disabled = false;
+  }
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
