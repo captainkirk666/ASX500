@@ -90,8 +90,8 @@
   .top-grid{
     display:grid;
     grid-template-columns:repeat(6, 1fr);
-    column-gap:3mm;
-    margin-bottom:3mm;
+    column-gap:2mm;
+    margin-bottom:2mm;
     flex-shrink:0;
   }
   .panel{
@@ -99,7 +99,7 @@
     flex-direction:column;
     min-width:0;
     overflow:hidden;
-    padding-left:2.5mm;
+    padding-left:2mm;
   }
   .panel:first-child{padding-left:0;}
   .panel-head{
@@ -125,7 +125,7 @@
     gap:3pt;
     padding:2pt 4pt;
     margin-bottom:1pt;
-    background:#e6e6e6;
+    background:#ededed;
     font-family:'Roboto Condensed', Arial, sans-serif;
     -webkit-print-color-adjust:exact;
     print-color-adjust:exact;
@@ -150,6 +150,10 @@
     flex:0 0 auto;
     text-align:left;
   }
+  .panel-row.row-3col .price{
+    width:auto;
+    flex:1;
+  }
   .panel-row .chg{
     font-size:10pt;
     font-weight:700;
@@ -161,13 +165,13 @@
   .panel-row .chg.down{color:#a3231d;}
   .panel-row .chg.flat{color:#555;}
   .panel-row .val{
-    font-size:10.5pt;
+    font-size:9.45pt;
     font-weight:900;
     color:#fff;
     white-space:nowrap;
     flex-shrink:0;
-    padding:1.4pt 5.6pt;
-    border-radius:2.6pt;
+    padding:1.26pt 5.04pt;
+    border-radius:2.34pt;
     -webkit-print-color-adjust:exact;
     print-color-adjust:exact;
   }
@@ -186,7 +190,7 @@
     flex:1;
     display:grid;
     grid-template-columns:1fr 1fr 1fr;
-    column-gap:4mm;
+    column-gap:3mm;
     overflow:visible;
     min-height:0;
   }
@@ -197,7 +201,7 @@
   }
   .col:not(:first-child){
     border-left:0.6pt solid #111;
-    padding-left:4mm;
+    padding-left:3mm;
   }
 
   /* header + rows share the exact same grid, inside the exact same column,
@@ -439,6 +443,9 @@ function changeStr(r){
 function panelRowHtml(name, price, chg, value, dir){
   return `<div class="panel-row"><span class="name">${name}</span><span class="price">${price}</span><span class="chg ${dir}">${chg}</span><span class="val ${dir}">${value}</span></div>`;
 }
+function panelRow3ColHtml(name, price, value, dir){
+  return `<div class="panel-row row-3col"><span class="name">${name}</span><span class="price">${price}</span><span class="val ${dir}">${value}</span></div>`;
+}
 function renderPanelList(elId, items, labelFn, priceFn, chgFn, valueFn, dirFn){
   const el = document.getElementById(elId);
   if (!items.length){ el.innerHTML = '<div class="panel-empty">No data</div>'; return; }
@@ -502,6 +509,8 @@ async function loadKeyResources(proxyItems){
   try{
     const text = await fetchCsvText(COMMODITIES_CSV_URL);
     const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+    console.log('[Commodities] raw CSV text (first 300 chars):', text.slice(0, 300));
+    console.log('[Commodities] parsed rows:', parsed.data);
     const commodityRows = parsed.data.map(r => {
       const keys = Object.keys(r);
       const name = (r['Commodity'] !== undefined ? r['Commodity'] : r[keys[0]] || '').toString().trim();
@@ -510,6 +519,7 @@ async function loadKeyResources(proxyItems){
       const changePct = num(r['Change %'] !== undefined ? r['Change %'] : r[keys[5]]);
       return { name, price, change, changePct };
     }).filter(r => r.name && !isNaN(r.price));
+    console.log('[Commodities] rows after filtering:', commodityRows);
 
     if (commodityRows.length){
       // Only overwrite the "known good" snapshot on an actual successful fetch
@@ -518,6 +528,7 @@ async function loadKeyResources(proxyItems){
     }
     renderResourceRows(panelEl, lastGoodResourceRows || proxyRows);
   }catch(e){
+    console.error('[Commodities] fetch/parse failed:', e);
     // Network/proxy hiccup — keep showing the last known-good data rather
     // than wiping the panel. Only show proxy-only as an absolute last resort
     // if we've never had a successful fetch at all.
@@ -567,9 +578,8 @@ async function loadIndices(){
       lastGoodIndicesHtml = finalRows.slice(0, 10).map(r => {
         const dir = isNaN(r.change) ? 'flat' : (r.change > 0 ? 'up' : r.change < 0 ? 'down' : 'flat');
         const pct = isNaN(r.changePct) ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
-        const chgDisp = isNaN(r.change) ? '—' : (r.change >= 0 ? '+' : '') + r.change.toFixed(1);
         const priceDisp = isNaN(r.price) ? '—' : r.price.toLocaleString(undefined, {maximumFractionDigits: 1, minimumFractionDigits: 1});
-        return panelRowHtml(r.name, priceDisp, chgDisp, pct, dir);
+        return panelRow3ColHtml(r.name, priceDisp, pct, dir);
       }).join('');
     }
 
