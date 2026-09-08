@@ -105,13 +105,13 @@
   }
   .panel:first-child{border-left:none;padding-left:0;}
   .panel-head{
-    font-size:9.5pt;
+    font-size:14pt;
     font-weight:900;
     letter-spacing:0.1pt;
     color:#111;
     padding-bottom:3pt;
     margin-bottom:3pt;
-    border-bottom:2pt solid var(--accent, #111);
+    border-bottom:1pt solid #000;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -125,8 +125,11 @@
     align-items:center;
     justify-content:space-between;
     gap:4pt;
-    padding:2pt 0;
-    border-bottom:0.3pt solid #eee;
+    padding:2pt 4pt;
+    margin-bottom:1pt;
+    background:#e6e6e6;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
   }
   .panel-row .name{
     font-size:9.5pt;
@@ -139,29 +142,23 @@
   .panel-row .val{
     font-size:11.5pt;
     font-weight:900;
+    color:#fff;
     white-space:nowrap;
     flex-shrink:0;
-    padding:1pt 5pt;
+    padding:1.5pt 6pt;
     border-radius:3pt;
     -webkit-print-color-adjust:exact;
     print-color-adjust:exact;
   }
-  .panel-row .val.up{color:#0f6b34;background:#e2f5ea;}
-  .panel-row .val.down{color:#a3231d;background:#fbe9e8;}
-  .panel-row .val.flat{color:#444;background:#f0f0f0;}
+  .panel-row .val.up{background:#0d7a3d;}
+  .panel-row .val.down{background:#b8241a;}
+  .panel-row .val.flat{background:#000;}
   .panel-empty{
     font-size:7pt;
     color:#888;
     font-style:italic;
     padding:4pt 2pt;
   }
-
-  .panel-indices   { --accent:#1a3a5c; }
-  .panel-winners   { --accent:#0f6b34; }
-  .panel-losers    { --accent:#a3231d; }
-  .panel-leaders   { --accent:#b8860b; }
-  .panel-volume    { --accent:#1565c0; }
-  .panel-resources { --accent:#7a4a1e; }
 
   /* ---------- three column layout ---------- */
   .columns{
