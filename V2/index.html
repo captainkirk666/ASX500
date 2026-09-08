@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASX WATCH — Live Ticker Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e14;
+    --panel:#10151f;
+    --panel-2:#141b27;
+    --line:#232c3a;
+    --amber:#ffb300;
+    --amber-dim:#8a6a1f;
+    --green:#3ecf8e;
+    --red:#ff5c5c;
+    --text:#d8dee9;
+    --muted:#5c6773;
+    --faint:#3a4351;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Mono', ui-monospace, monospace;
+    font-size:13px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 20px 60px;}
+
+  /* ---- Masthead ---- */
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--amber);
+    padding-bottom:14px;
+    margin-bottom:4px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .masthead h1{
+    font-size:26px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    margin:0;
+    color:#fff;
+  }
+  .masthead h1 span{color:var(--amber);}
+  .masthead .sub{
+    color:var(--muted);
+    font-size:12px;
+    margin-top:4px;
+  }
+  .status{
+    text-align:right;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .status .live{
+    color:var(--green);
+    font-weight:600;
+  }
+  .live-dot{
+    display:inline-block;
+    width:7px;height:7px;
+    border-radius:50%;
+    background:var(--green);
+    margin-right:6px;
+    animation:pulse 2s infinite;
+    vertical-align:middle;
+  }
+  .live-dot.stale{background:var(--muted);animation:none;}
+  @keyframes pulse{
+    0%,100%{opacity:1;}
+    50%{opacity:0.25;}
+  }
+  .status .clock{color:var(--text);font-weight:600;}
+
+  /* ---- Summary strip ---- */
+  .summary{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    margin:18px 0;
+  }
+  .stat{
+    background:var(--panel);
+    padding:12px 14px;
+  }
+  .stat .n{
+    font-size:20px;
+    font-weight:700;
+    color:#fff;
+  }
+  .stat .l{
+    font-size:10.5px;
+    color:var(--muted);
+    margin-top:3px;
+    letter-spacing:0.4px;
+  }
+  .stat.up .n{color:var(--green);}
+  .stat.down .n{color:var(--red);}
+
+  /* ---- Controls ---- */
+  .controls{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .prompt{
+    flex:1;
+    min-width:220px;
+    display:flex;
+    align-items:center;
+    background:var(--panel);
+    border:1px solid var(--line);
+    padding:8px 12px;
+  }
+  .prompt span{color:var(--amber);margin-right:8px;}
+  .prompt input{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-family:inherit;
+    font-size:13px;
+  }
+  .prompt input::placeholder{color:var(--faint);}
+  button{
+    font-family:inherit;
+    font-size:12px;
+    background:var(--panel);
+    color:var(--text);
+    border:1px solid var(--line);
+    padding:9px 14px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  button:hover{border-color:var(--amber-dim);color:#fff;}
+  button.primary{
+    background:var(--amber);
+    color:#161200;
+    border-color:var(--amber);
+    font-weight:700;
+  }
+  button.primary:hover{background:#ffc233;}
+  label.toggle{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:var(--muted);
+    font-size:12px;
+    cursor:pointer;
+  }
+
+  /* ---- Table ---- */
+  .table-scroll{
+    border:1px solid var(--line);
+    overflow-x:auto;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:820px;
+  }
+  thead th{
+    position:sticky;
+    top:0;
+    background:var(--panel-2);
+    color:var(--amber);
+    text-align:right;
+    font-weight:600;
+    font-size:11.5px;
+    letter-spacing:0.3px;
+    padding:10px 12px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    user-select:none;
+    white-space:nowrap;
+  }
+  thead th:first-child{text-align:left;}
+  thead th:hover{color:#fff;}
+  thead th .arrow{color:var(--faint);margin-left:3px;font-size:10px;}
+  thead th.sorted .arrow{color:var(--amber);}
+  tbody td{
+    padding:7px 12px;
+    text-align:right;
+    border-bottom:1px solid #171d28;
+    white-space:nowrap;
+  }
+  tbody td:first-child{text-align:left;}
+  tbody tr:hover{background:#131a26;}
+  tbody tr.na{opacity:0.35;}
+  .ticker{
+    font-weight:700;
+    color:#fff;
+    letter-spacing:0.3px;
+  }
+  .up{color:var(--green);}
+  .down{color:var(--red);}
+  .flat{color:var(--muted);}
+  .empty-row td{
+    text-align:center;
+    color:var(--muted);
+    padding:30px;
+  }
+
+  /* ---- Footer ---- */
+  .foot{
+    margin-top:16px;
+    display:flex;
+    justify-content:space-between;
+    color:var(--faint);
+    font-size:11px;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .foot a{color:var(--muted);}
+
+  .count-badge{
+    color:var(--muted);
+    font-size:11.5px;
+    white-space:nowrap;
+  }
+
+  /* ---- Print ---- */
+  @media print{
+    body{background:#fff;color:#111;font-size:10px;}
+    .controls,.status .live-dot,.no-print{display:none !important;}
+    .wrap{max-width:100%;padding:0;}
+    .masthead{border-bottom:2px solid #111;}
+    .masthead h1{color:#111;}
+    .masthead h1 span{color:#111;}
+    .status{color:#333;}
+    .status .clock{color:#111;}
+    .summary{background:#ccc;border-color:#ccc;}
+    .stat{background:#fff;border-bottom:1px solid #ddd;}
+    .stat .n{color:#111;}
+    .stat.up .n{color:#0a7a4a;}
+    .stat.down .n{color:#a3251d;}
+    .table-scroll{border-color:#ccc;overflow:visible;}
+    thead th{background:#eee;color:#111;position:static;border-bottom:1px solid #bbb;}
+    tbody td{border-bottom:1px solid #eee;color:#111;}
+    .ticker{color:#111;}
+    .up{color:#0a7a4a;}
+    .down{color:#a3251d;}
+    tr{page-break-inside:avoid;}
+    thead{display:table-header-group;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>ASX <span>WATCH</span></h1>
+      <div class="sub">live watchlist · sourced from Google Sheets / GOOGLEFINANCE</div>
+    </div>
+    <div class="status">
+      <div><span class="live-dot" id="liveDot"></span><span class="live" id="liveLabel">CONNECTING…</span></div>
+      <div>last sync <span class="clock" id="lastSync">—</span></div>
+    </div>
+  </div>
+
+  <div class="summary" id="summary">
+    <div class="stat"><div class="n" id="statTotal">—</div><div class="l">SYMBOLS TRACKED</div></div>
+    <div class="stat up"><div class="n" id="statUp">—</div><div class="l">ADVANCING</div></div>
+    <div class="stat down"><div class="n" id="statDown">—</div><div class="l">DECLINING</div></div>
+    <div class="stat"><div class="n" id="statFlat">—</div><div class="l">UNCHANGED</div></div>
+    <div class="stat" id="statAvgWrap"><div class="n" id="statAvg">—</div><div class="l">AVG CHANGE %</div></div>
+  </div>
+
+  <div class="controls no-print">
+    <div class="prompt">
+      <span>&gt;</span>
+      <input id="search" type="text" placeholder="grep ticker…" autocomplete="off">
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="hideNa">
+      hide inactive
+    </label>
+    <span class="count-badge" id="countBadge"></span>
+    <button id="refreshBtn">↻ refresh</button>
+    <button class="primary" id="printBtn">⬇ export PDF</button>
+  </div>
+
+  <div class="table-scroll">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th data-key="Ticker" data-type="str">TICKER<span class="arrow"></span></th>
+          <th data-key="Price" data-type="num">PRICE<span class="arrow"></span></th>
+          <th data-key="Open" data-type="num">OPEN<span class="arrow"></span></th>
+          <th data-key="Change" data-type="num">CHG<span class="arrow"></span></th>
+          <th data-key="ChangePct" data-type="num">CHG %<span class="arrow"></span></th>
+          <th data-key="Volume" data-type="numsuffix">VOL<span class="arrow"></span></th>
+          <th data-key="AveVol" data-type="numsuffix">AVG VOL<span class="arrow"></span></th>
+          <th data-key="High52" data-type="num">52W HIGH<span class="arrow"></span></th>
+          <th data-key="Low52" data-type="num">52W LOW<span class="arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr class="empty-row"><td colspan="9">loading feed…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    <span>data refreshes every 60s while this page is open · values reflect the last GOOGLEFINANCE calculation in the source sheet</span>
+    <span id="rangeNote"></span>
+  </div>
+
+</div>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSf6ldadqkMU5BqZt4PsbRGL9Kww33aZ1t60blQv2nDFZ--JjusENl5H7iPe4Jr-dMxeUXgbBkAsSjo/pub?output=csv";
+const REFRESH_MS = 60000;
+
+let rows = [];
+let sortKey = null;
+let sortDir = 1;
+
+function num(v){
+  if (v === undefined || v === null) return NaN;
+  const s = String(v).replace(/[^0-9.\-]/g,'');
+  if (s === '' || s === '-' ) return NaN;
+  return parseFloat(s);
+}
+
+function volToNumber(v){
+  if (!v) return NaN;
+  const s = String(v).trim();
+  const m = s.match(/^([\-0-9.]+)\s*M?$/i);
+  if (!m) return NaN;
+  return parseFloat(m[1]);
+}
+
+function parseRows(raw){
+  return raw.map(r => {
+    const price = num(r['Price']);
+    const open = num(r['Open']);
+    const change = num(r['Change']);
+    const changePct = num(r['Change %']);
+    const isNa = isNaN(price);
+    return {
+      Ticker: (r['Ticker'] || '').trim(),
+      Price: price,
+      Open: open,
+      Change: change,
+      ChangePct: changePct,
+      Volume: r['Volume'] || '',
+      VolumeNum: volToNumber(r['Volume']),
+      AveVol: r['Ave Vol'] || '',
+      AveVolNum: volToNumber(r['Ave Vol']),
+      High52: num(r['52-week high']),
+      Low52: num(r['52-week low']),
+      na: isNa
+    };
+  }).filter(r => r.Ticker);
+}
+
+function fmt(v, decimals){
+  if (v === undefined || v === null || isNaN(v)) return '—';
+  return v.toFixed(decimals !== undefined ? decimals : 2);
+}
+
+function renderSummary(list){
+  const active = list.filter(r => !r.na);
+  const up = active.filter(r => r.Change > 0).length;
+  const down = active.filter(r => r.Change < 0).length;
+  const flat = active.length - up - down;
+  let sum = 0, count = 0;
+  active.forEach(r => {
+    if (!isNaN(r.ChangePct)){
+      const signed = r.Change < 0 ? -Math.abs(r.ChangePct) : Math.abs(r.ChangePct);
+      sum += signed; count++;
+    }
+  });
+  const avg = count ? (sum/count) : 0;
+
+  document.getElementById('statTotal').textContent = list.length;
+  document.getElementById('statUp').textContent = up;
+  document.getElementById('statDown').textContent = down;
+  document.getElementById('statFlat').textContent = flat;
+  const avgEl = document.getElementById('statAvg');
+  avgEl.textContent = (avg >= 0 ? '+' : '') + avg.toFixed(2) + '%';
+  const wrap = document.getElementById('statAvgWrap');
+  wrap.className = 'stat ' + (avg > 0 ? 'up' : avg < 0 ? 'down' : '');
+}
+
+function currentFilter(){
+  const q = document.getElementById('search').value.trim().toUpperCase();
+  const hideNa = document.getElementById('hideNa').checked;
+  let list = rows;
+  if (hideNa) list = list.filter(r => !r.na);
+  if (q) list = list.filter(r => r.Ticker.toUpperCase().includes(q));
+  return list;
+}
+
+function sortList(list){
+  if (!sortKey) return list;
+  const type = document.querySelector(`th[data-key="${sortKey}"]`).dataset.type;
+  return [...list].sort((a,b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    if (type === 'numsuffix'){ av = a[sortKey+'Num']; bv = b[sortKey+'Num']; }
+    if (type === 'str'){
+      av = (av||'').toString(); bv = (bv||'').toString();
+      return sortDir * av.localeCompare(bv);
+    }
+    const an = isNaN(av) ? -Infinity : av;
+    const bn = isNaN(bv) ? -Infinity : bv;
+    return sortDir * (an - bn);
+  });
+}
+
+function render(){
+  const filtered = sortList(currentFilter());
+  renderSummary(rows);
+  const tbody = document.getElementById('tbody');
+  document.getElementById('countBadge').textContent = `${filtered.length} / ${rows.length} shown`;
+
+  if (!filtered.length){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">no symbols match that query</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => {
+    const dirClass = r.na ? 'flat' : (r.Change > 0 ? 'up' : r.Change < 0 ? 'down' : 'flat');
+    const sign = r.na ? '' : (r.Change > 0 ? '+' : r.Change < 0 ? '' : '');
+    const pctSign = r.na ? '' : (r.Change < 0 ? '-' : '+');
+    const pctVal = isNaN(r.ChangePct) ? '—' : Math.abs(r.ChangePct).toFixed(2) + '%';
+    return `<tr class="${r.na ? 'na' : ''}">
+      <td class="ticker">${r.Ticker}</td>
+      <td>${r.na ? '—' : '$'+fmt(r.Price)}</td>
+      <td>${r.na ? '—' : '$'+fmt(r.Open)}</td>
+      <td class="${dirClass}">${r.na ? '—' : sign+fmt(r.Change)}</td>
+      <td class="${dirClass}">${r.na ? '—' : pctSign+pctVal}</td>
+      <td>${r.Volume || '—'}</td>
+      <td>${r.AveVol || '—'}</td>
+      <td>${r.na ? '—' : '$'+fmt(r.High52)}</td>
+      <td>${r.na ? '—' : '$'+fmt(r.Low52)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateSortHeaders(){
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('sorted');
+    const arrow = th.querySelector('.arrow');
+    if (th.dataset.key === sortKey){
+      th.classList.add('sorted');
+      arrow.textContent = sortDir === 1 ? '▲' : '▼';
+    } else {
+      arrow.textContent = '';
+    }
+  });
+}
+
+function setStatus(state){
+  const dot = document.getElementById('liveDot');
+  const label = document.getElementById('liveLabel');
+  if (state === 'live'){
+    dot.className = 'live-dot';
+    label.textContent = 'LIVE';
+    label.style.color = 'var(--green)';
+  } else if (state === 'loading'){
+    dot.className = 'live-dot stale';
+    label.textContent = 'SYNCING…';
+    label.style.color = 'var(--muted)';
+  } else {
+    dot.className = 'live-dot stale';
+    label.textContent = 'SYNC FAILED';
+    label.style.color = 'var(--red)';
+  }
+}
+
+async function fetchCsvText(){
+  // Google's published-CSV endpoint frequently omits CORS headers, so a
+  // direct browser fetch can be silently blocked even though the link is
+  // public. Try direct first, then fall back to CORS-friendly proxies.
+  const attempts = [
+    CSV_URL,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(CSV_URL),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(CSV_URL)
+  ];
+  const errors = [];
+  for (const url of attempts){
+    try{
+      const res = await fetch(url, {cache:'no-store'});
+      if (!res.ok) { errors.push('http '+res.status+' from '+new URL(url).hostname); continue; }
+      const text = await res.text();
+      if (text && text.trim().length > 20 && text.includes(',')) return text;
+      errors.push('empty response from '+new URL(url).hostname);
+    }catch(e){
+      errors.push((e && e.message ? e.message : 'network error')+' from '+new URL(url).hostname);
+    }
+  }
+  throw new Error(errors.join(' | '));
+}
+
+async function loadData(){
+  setStatus('loading');
+  try{
+    const text = await fetchCsvText();
+    const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+    rows = parseRows(parsed.data);
+    setStatus('live');
+    document.getElementById('lastSync').textContent = new Date().toLocaleTimeString();
+    render();
+  }catch(e){
+    setStatus('error');
+    const tbody = document.getElementById('tbody');
+    if (!rows.length){
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="9">could not reach the published sheet (network/CORS blocked). confirm it is still published to web, then hit refresh. error: ${(e && e.message) || 'unknown'}</td></tr>`;
+    }
+  }
+}
+
+document.querySelectorAll('thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if (sortKey === key){ sortDir *= -1; } else { sortKey = key; sortDir = key === 'Ticker' ? 1 : -1; }
+    updateSortHeaders();
+    render();
+  });
+});
+
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('hideNa').addEventListener('change', render);
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>
