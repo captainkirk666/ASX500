@@ -138,6 +138,16 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
+    flex:1;
+    min-width:0;
+  }
+  .panel-row .price{
+    font-size:9.5pt;
+    font-weight:600;
+    color:#333;
+    white-space:nowrap;
+    flex-shrink:0;
+    text-align:right;
   }
   .panel-row .val{
     font-size:9.2pt;
@@ -405,13 +415,17 @@ function pctStr(r){
   const sign = r.Change < 0 ? '-' : '+';
   return sign + Math.abs(r.ChangePct).toFixed(2) + '%';
 }
-function panelRowHtml(name, value, dir){
-  return `<div class="panel-row"><span class="name">${name}</span><span class="val ${dir}">${value}</span></div>`;
+function priceStr(r){
+  if (!r || r.na || isNaN(r.Price)) return '—';
+  return '$' + r.Price.toFixed(2);
 }
-function renderPanelList(elId, items, labelFn, valueFn, dirFn){
+function panelRowHtml(name, price, value, dir){
+  return `<div class="panel-row"><span class="name">${name}</span><span class="price">${price}</span><span class="val ${dir}">${value}</span></div>`;
+}
+function renderPanelList(elId, items, labelFn, priceFn, valueFn, dirFn){
   const el = document.getElementById(elId);
   if (!items.length){ el.innerHTML = '<div class="panel-empty">No data</div>'; return; }
-  el.innerHTML = items.map(item => panelRowHtml(labelFn(item), valueFn(item), dirFn(item))).join('');
+  el.innerHTML = items.map(item => panelRowHtml(labelFn(item), priceFn(item), valueFn(item), dirFn(item))).join('');
 }
 
 function renderTopGrid(rows){
@@ -441,11 +455,11 @@ function renderTopGrid(rows){
     .map(kr => { const row = active.find(r => r.Ticker === kr.ticker); return row ? { name: kr.name, row } : null; })
     .filter(Boolean);
 
-  renderPanelList('panel-winners', winners, r => r.Ticker, r => pctStr(r), r => dirOf(r));
-  renderPanelList('panel-losers', losers, r => r.Ticker, r => pctStr(r), r => dirOf(r));
-  renderPanelList('panel-volume', volumeLeaders, r => r.Ticker, r => r.Volume || '—', () => 'flat');
-  renderPanelList('panel-leaders', asxLeaders, r => r.Ticker, r => pctStr(r), r => dirOf(r));
-  renderPanelList('panel-resources', keyResources, item => item.name, item => pctStr(item.row), item => dirOf(item.row));
+  renderPanelList('panel-winners', winners, r => r.Ticker, r => priceStr(r), r => pctStr(r), r => dirOf(r));
+  renderPanelList('panel-losers', losers, r => r.Ticker, r => priceStr(r), r => pctStr(r), r => dirOf(r));
+  renderPanelList('panel-volume', volumeLeaders, r => r.Ticker, r => priceStr(r), r => r.Volume || '—', () => 'flat');
+  renderPanelList('panel-leaders', asxLeaders, r => r.Ticker, r => priceStr(r), r => pctStr(r), r => dirOf(r));
+  renderPanelList('panel-resources', keyResources, item => item.name, item => priceStr(item.row), item => pctStr(item.row), item => dirOf(item.row));
 }
 
 async function loadIndices(){
@@ -465,6 +479,7 @@ async function loadIndices(){
 
     const finalRows = cleanRows.map(r => ({
       name: r.name,
+      price: r.price,
       change: r.change,
       changePct: isNaN(r.changePctRaw) ? NaN : r.changePctRaw * 100
     }));
@@ -474,7 +489,8 @@ async function loadIndices(){
     panelEl.innerHTML = finalRows.slice(0, 10).map(r => {
       const dir = isNaN(r.change) ? 'flat' : (r.change > 0 ? 'up' : r.change < 0 ? 'down' : 'flat');
       const pct = isNaN(r.changePct) ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
-      return panelRowHtml(r.name, pct, dir);
+      const priceDisp = isNaN(r.price) ? '—' : r.price.toLocaleString(undefined, {maximumFractionDigits: 1, minimumFractionDigits: 1});
+      return panelRowHtml(r.name, priceDisp, pct, dir);
     }).join('');
   }catch(e){
     panelEl.innerHTML = '<div class="panel-empty">Could not load indices</div>';
