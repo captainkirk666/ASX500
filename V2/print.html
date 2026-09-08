@@ -138,7 +138,8 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    flex:1;
+    width:38%;
+    flex:0 0 auto;
     min-width:0;
   }
   .panel-row .price{
@@ -146,8 +147,8 @@
     font-weight:600;
     color:#333;
     white-space:nowrap;
-    flex-shrink:0;
-    text-align:right;
+    flex:1;
+    text-align:left;
   }
   .panel-row .val{
     font-size:9.2pt;
@@ -162,7 +163,7 @@
   }
   .panel-row .val.up{background:#0d7a3d;}
   .panel-row .val.down{background:#b8241a;}
-  .panel-row .val.flat{background:#000;}
+  .panel-row .val.flat{background:#4d4d4d;}
   .panel-empty{
     font-size:7pt;
     color:#888;
@@ -473,9 +474,12 @@ async function loadIndices(){
     const parsed = Papa.parse(text, {header:false, skipEmptyLines:true});
 
     // Drop a possible header row (where the "price" column isn't numeric).
+    // Shorten a few index names for display without needing to edit the sheet.
+    const NAME_OVERRIDES = { 'Nasdaq Composite': 'Nasdaq', 'Dow Jones Industrial Average': 'Dow Jones' };
     const cleanRows = parsed.data
       .map(r => ({ name: (r[0] || '').toString().trim(), price: num(r[1]), change: num(r[2]), changePctRaw: num(r[3]) }))
-      .filter(r => r.name && !isNaN(r.price));
+      .filter(r => r.name && !isNaN(r.price))
+      .map(r => ({ ...r, name: NAME_OVERRIDES[r.name] || r.name }));
 
     const finalRows = cleanRows.map(r => ({
       name: r.name,
